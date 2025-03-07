@@ -1,94 +1,197 @@
-async function calculatePremiums() {
-    console.log("Button clicked");
-    
-    // Get input values
-    const ticker = document.getElementById('ticker').value.toUpperCase();
-    const expirationDate = new Date(document.getElementById('expirationDate').value);
-    const expectedYield = parseFloat(document.getElementById('expectedYield').value);
-    const currentDate = new Date('2025-03-06');
-    
-    // Fetch market price from Alpha Vantage
+let selectedYield = 8;
+let selectedExpirations = [];
+
+function showError(message) {
+    const errorDisplay = document.getElementById('errorDisplay');
+    errorDisplay.innerText = message;
+    errorDisplay.classList.add('active');
+    setTimeout(() => errorDisplay.classList.remove('active'), 5000);
+}
+
+function clearError() {
+    const errorDisplay = document.getElementById('errorDisplay');
+    errorDisplay.classList.remove('active');
+}
+
+async function fetchMarketData(ticker) {
     const apiKey = 'QEI9SAAQNT1F5S95'; // Replace with your Alpha Vantage API key
-    const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${ticker}&apikey=${apiKey}`;
-    let marketPrice;
-    
+    const quoteUrl = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${ticker}&apikey=${apiKey}`;
+    const historyUrl = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${ticker}&outputsize=compact&apikey=${apiKey}`;
+
     try {
-    const response = await fetch(url);
-    const data = await response.json();
-    marketPrice = parseFloat(data['Global Quote']['05. price']);
-    if (!marketPrice) throw new Error('Invalid ticker or no price data');
-    document.getElementById('marketPriceDisplay').innerText =
-    `Current Market Price: $${marketPrice.toFixed(2)}`;
+        const quoteResponse = await fetch(quoteUrl);
+        if (!quoteResponse.ok) throw new Error('Failed to fetch current price. Check your API key or network.');
+        const quoteData = await quoteResponse.json();
+        const marketPrice = parseFloat(quoteData['Global Quote']['05. price']);
+        if (!marketPrice || isNaN(marketPrice)) throw new Error('Invalid ticker or no price data available.');
+
+        const historyResponse = await fetch(historyUrl);
+        if (!historyResponse.ok) throw new Error('Failed to fetch historical data. Check your API key or network.');
+        const historyData = await historyResponse.json();
+        const timeSeries = historyData['Time Series (Daily)'];
+        if (!timeSeries) throw new Error('No historical data available for this ticker.');
+        const prices = Object.values(timeSeries).map(day => parseFloat(day['4. close']));
+        const lowestPrice = Math.min(...prices);
+        if (isNaN(lowestPrice)) throw new Error('Invalid historical price data.');
+
+        return { marketPrice, lowestPrice };
     } catch (error) {
-    document.getElementById('result').innerText =
-    'Error: Could not fetch market price. Check ticker or API key.';
-    console.error(error);
-    return;
+        throw new Error(`Error fetching market data: ${error.message}`);
     }
-    
-    // Calculate time to expiration in days
-    const timeDiff = expirationDate - currentDate;
-    const T = timeDiff / (1000 * 60 * 60 * 24);
-    
-    // Validate inputs
-    if (T <= 0) {
-    document.getElementById('result').innerText =
-    'Error: Expiration date must be after March 6, 2025.';
-    return;
-    }
-    if (marketPrice <= 0 || expectedYield <= 0) {
-    document.getElementById('result').innerText =
-    'Error: Market price and expected yield mustprototypesmust be positive.';
-    return;
-    }
-    
-    // IBKR Pro commission and fees (per contract, 1 contract per strike)
-    const baseCommission = 0.65; // IBKR Pro base commission per contract
-    const exchangeFee = 0.30; // Average exchange fee per contract
-    const clearingFee = 0.05; // OCC clearing fee per contract
-    const totalFeesPerContract = baseCommission + exchangeFee + clearingFee; // $1.00 per contract
-    
-    // Generate strike prices (95%, 90%, 85%, 80%, 75% of market price, rounded down)
-    const strikePrices = [];
-    for (let i = 0; i < 5; i++) {
-    const percentage = 0.95 - (i * 0.05);
-    const strike = Math.floor(marketPrice * percentage);
-    if (strike > 0) {
-    strikePrices.push(strike);
-    }
-    }
-    
-    // Calculate premiums with commission and fees deducted (1 contract per strike)
-    const premiums = strikePrices.map(strike => {
-    const grossPremiumPerShare = strike * (expectedYield / 100) * (T / 365);
-    const grossPremiumPerContract = grossPremiumPerShare * 100; // 100 shares per contract
-    const netPremiumPerContract = Math.max(grossPremiumPerContract - totalFeesPerContract, 0);
-    const netPremiumPerShare = netPremiumPerContract / 100; // Back to per-share for display
-    return {
-    strike,
-    grossPremium: grossPremiumPerShare.toFixed(4),
-    netPremium: netPremiumPerShare.toFixed(4),
-    commission: totalFeesPerContract.toFixed(2)
-    };
+}
+
+async function calculatePremiums() {
+    clearError();
+    const ticker = document.getElementById('ticker').value.trim().toUpperCase();
+    const currentDate = new Date();
+    const expirationDates = selectedExpirations.map(days => {
+        const date = new Date(currentDate);
+        date.setDate(date.getDate() + days);
+        return date;
     });
-    
-    // Generate result table with commission column
-    let tableHTML = '<table><tr><th>Strike Price ($)</th><th>Net Premium ($)</th><th>Expected Commission & Fees ($)</th></tr>';
-    premiums.forEach((item, index) => {
-    tableHTML += `<tr data-index="${index}"><td>${item.strike}</td><td>${item.netPremium}</td><td>${item.commission}</td></tr>`;
-    });
-    tableHTML += '</table>';
-    document.getElementById('result').innerHTML = tableHTML;
-    
-    // Add click event listeners
-    const rows = document.querySelectorAll('#result table tr:not(:first-child)');
-    rows.forEach(row => {
-    row.addEventListener('click', function() {
-    const index = this.getAttribute('data-index');
-    const selected = premiums[index];
-    const usdAmount = (selected.netPremium * 100).toFixed(2); // Total net for 1 contract
-    const message = `You will get ${usdAmount} USD, expected commissions & fees are ${selected.commission} USD in ${T} days, the expected yield is ${expectedYield}%`;
-    document.getElementById('clickResult').innerText = message;
-    });
-    });
+
+    if (!ticker) {
+        showError('Please enter a valid stock ticker.');
+        return;
     }
+    if (!selectedExpirations.length) {
+        showError('Please select at least one expiration period.');
+        return;
+    }
+
+    try {
+        const { marketPrice, lowestPrice } = await fetchMarketData(ticker);
+        document.getElementById('marketPriceDisplay').innerHTML = `
+            Current Market Price: <span style="color: #276749;">$${marketPrice.toFixed(2)}</span> USD<br>
+            3-Month Low: <span style="color: #c53030;">$${lowestPrice.toFixed(2)}</span> USD
+        `;
+
+        const totalFeesPerContract = 1.00;
+        const strikePercentages = [0.95, 0.90, 0.85, 0.80, 0.75];
+        const strikePrices = strikePercentages.map(p => Math.floor(marketPrice * p)).filter(s => s > 0);
+
+        const results = expirationDates.map(expirationDate => {
+            const T = (expirationDate - currentDate) / (1000 * 60 * 60 * 24);
+            if (T <= 0) throw new Error('Expiration date is in the past.');
+            const premiums = strikePrices.map(strike => {
+                const grossPremiumPerShare = strike * (selectedYield / 100) * (T / 365);
+                const netPremiumPerContract = Math.max((grossPremiumPerShare * 100) - totalFeesPerContract, 0);
+                const netPremiumPerShare = netPremiumPerContract / 100;
+                const maxLoss = (strike * 100) - (netPremiumPerShare * 100);
+                return { netPremium: netPremiumPerShare.toFixed(2), maxLoss: maxLoss.toFixed(2), T };
+            });
+            return { expirationDate: expirationDate.toISOString().split('T')[0], premiums };
+        });
+
+        let tableHTML = '<table><tr><th>Expiration</th>';
+        strikePrices.forEach(strike => tableHTML += `<th>${strike} ($)</th>`);
+        tableHTML += '</tr>';
+        results.forEach((result, rowIndex) => {
+            tableHTML += `<tr data-row="${rowIndex}"><td>${result.expirationDate}</td>`;
+            result.premiums.forEach((item, colIndex) => {
+                tableHTML += `<td data-col="${colIndex}">${item.netPremium}<br><span style="color: #e53e3e;">${item.maxLoss}</span></td>`;
+            });
+            tableHTML += '</tr>';
+        });
+        tableHTML += '</table>';
+        document.getElementById('result').innerHTML = tableHTML;
+
+        sessionStorage.setItem('results', JSON.stringify(results));
+        sessionStorage.setItem('strikePrices', JSON.stringify(strikePrices));
+
+        const cells = document.querySelectorAll('#result table td:not(:first-child)');
+        cells.forEach(cell => {
+            cell.addEventListener('click', function() {
+                document.querySelectorAll('#result td').forEach(c => c.classList.remove('highlighted'));
+                this.classList.add('highlighted');
+
+                const rowIndex = this.parentElement.getAttribute('data-row');
+                const colIndex = this.getAttribute('data-col');
+                const result = results[rowIndex];
+                const strike = strikePrices[colIndex];
+                const premium = result.premiums[colIndex].netPremium;
+                const maxLoss = result.premiums[colIndex].maxLoss;
+                const expiration = result.expirationDate;
+
+                document.getElementById('clickResult').innerHTML = `
+                    If you sell a put option at <span class="strike">$${strike}</span> USD 
+                    with an expiration date of <span class="date">${expiration}</span>, 
+                    then you will receive <span class="premium">$${(premium * 100).toFixed(2)}</span> USD. 
+                    The expected yield is <span class="yield">${selectedYield}%</span>, 
+                    with a max potential loss of <span class="loss">$${maxLoss}</span> USD.
+                `;
+
+                const reverseInput = document.getElementById('reverseInput');
+                reverseInput.classList.add('active');
+                reverseInput.dataset.row = rowIndex;
+                reverseInput.dataset.col = colIndex; // Store column index for cell-specific yield
+            });
+        });
+    } catch (error) {
+        showError(error.message);
+        console.error(error);
+    }
+}
+
+async function calculateYield() {
+    clearError();
+    const rowIndex = document.getElementById('reverseInput').dataset.row;
+    const colIndex = document.getElementById('reverseInput').dataset.col;
+    const premiumInput = document.getElementById('premiumInput').value;
+
+    if (!premiumInput || isNaN(premiumInput) || parseFloat(premiumInput) < 0) {
+        showError('Please enter a valid premium amount.');
+        return;
+    }
+
+    try {
+        const strikePrices = JSON.parse(sessionStorage.getItem('strikePrices'));
+        const results = JSON.parse(sessionStorage.getItem('results'));
+        if (!results || !strikePrices) throw new Error('No previous calculation data available. Please calculate premiums first.');
+
+        const result = results[rowIndex];
+        const strike = strikePrices[colIndex];
+        const expiration = result.expirationDate;
+        const T = result.premiums[0].T; // Time to expiration (same for all strikes in row)
+        const premium = parseFloat(premiumInput);
+        const totalFeesPerContract = 1.00;
+
+        const netPremiumPerContract = (premium * 100) - totalFeesPerContract;
+        const netPremiumPerShare = netPremiumPerContract / 100;
+        const annualizedYield = (netPremiumPerShare / strike) * (365 / T) * 100;
+
+        document.getElementById('yieldResult').innerHTML = `
+            For a premium of <span class="premium">$${premium.toFixed(2)}</span> USD per share 
+            at a strike of <span class="strike">$${strike}</span> USD 
+            expiring on <span class="date">${expiration}</span>, 
+            the annualized yield is <span class="yield">${annualizedYield.toFixed(2)}%</span>.
+        `;
+    } catch (error) {
+        showError(`Error calculating yield: ${error.message}`);
+        console.error(error);
+    }
+}
+
+document.getElementById('yieldButtons').addEventListener('click', (e) => {
+    if (e.target.tagName === 'BUTTON') {
+        document.querySelectorAll('#yieldButtons button').forEach(btn => btn.classList.remove('active'));
+        e.target.classList.add('active');
+        selectedYield = parseFloat(e.target.dataset.yield);
+    }
+});
+
+document.getElementById('expirationButtons').addEventListener('click', (e) => {
+    if (e.target.tagName === 'BUTTON') {
+        const days = parseInt(e.target.dataset.days);
+        if (e.target.classList.contains('active')) {
+            e.target.classList.remove('active');
+            selectedExpirations = selectedExpirations.filter(d => d !== days);
+        } else {
+            e.target.classList.add('active');
+            selectedExpirations.push(days);
+        }
+    }
+});
+
+document.getElementById('calculateButton').addEventListener('click', calculatePremiums);
+document.getElementById('reverseInput').querySelector('button').addEventListener('click', calculateYield);
