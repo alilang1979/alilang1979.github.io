@@ -1,159 +1,179 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Sell Put Option Premium Calculator</title>
-<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
-<style>
-body {
-font-family: 'Roboto', sans-serif;
-background-color: #f4f7fa;
-margin: 0;
-padding: 20px;
-display: flex;
-justify-content: center;
-min-height: 100vh;
-}
-.wrapper {
-display: flex;
-width: 100%;
-max-width: 1000px;
-gap: 20px;
-}
-.main-content {
-flex: 1;
-background-color: #ffffff;
-padding: 30px;
-border-radius: 10px;
-box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-max-width: 600px;
-}
-.summary {
-width: 300px;
-background-color: #ffffff;
-padding: 20px;
-border-radius: 10px;
-box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-font-size: 14px;
-color: #333;
-}
-.summary h2 {
-color: #1a3c6d;
-font-size: 18px;
-margin-bottom: 15px;
-}
-.summary p {
-margin-bottom: 15px;
-line-height: 1.5;
-}
-h1 {
-color: #1a3c6d;
-font-size: 24px;
-margin-bottom: 20px;
-text-align: center;
-}
-form {
-display: flex;
-flex-direction: column;
-}
-label {
-color: #333;
-font-weight: bold;
-margin-bottom: 5px;
-}
-input {
-padding: 10px;
-margin-bottom: 15px;
-border: 1px solid #ccc;
-border-radius: 5px;
-font-size: 14px;
-transition: border-color 0.3s;
-}
-input:focus {
-border-color: #1a3c6d;
-outline: none;
-}
-button {
-background-color: #1a3c6d;
-color: #fff;
-padding: 12px;
-border: none;
-border-radius: 5px;
-font-size: 16px;
-cursor: pointer;
-transition: background-color 0.3s;
-}
-button:hover {
-background-color: #15325b;
-}
-#marketPriceDisplay {
-margin-top: 15px;
-color: #1a3c6d;
-font-size: 16px;
-text-align: center;
-font-weight: bold;
-}
-#result {
-margin-top: 20px;
-}
-table {
-width: 100%;
-border-collapse: collapse;
-font-size: 14px;
-}
-th, td {
-padding: 12px;
-text-align: right;
-border-bottom: 1px solid #e0e0e0;
-}
-th {
-background-color: #1a3c6d;
-color: #fff;
-font-weight: bold;
-}
-tr:nth-child(even) {
-background-color: #f9fafb;
-}
-tr:hover {
-background-color: #eef2f7;
-cursor: pointer;
-}
-#clickResult {
-margin-top: 15px;
-color: #1a3c6d;
-font-style: italic;
-text-align: center;
-}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"> <!-- Added for mobile responsiveness -->
+    <title>Sell Put Option Premium Calculator</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: #f4f7fa;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            min-height: 100vh;
+            font-size: 16px; /* Base font size increased for mobile */
+        }
+        .wrapper {
+            display: flex;
+            flex-direction: column; /* Stack vertically on small screens */
+            width: 100%;
+            max-width: 1000px;
+            gap: 20px;
+        }
+        .main-content {
+            background-color: #ffffff;
+            padding: 20px; /* Reduced padding for smaller screens */
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 600px;
+        }
+        .summary {
+            background-color: #ffffff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            font-size: 1rem; /* Relative unit */
+            color: #333;
+            width: 100%;
+            max-width: 600px; /* Match main content */
+        }
+        .summary h2 {
+            color: #1a3c6d;
+            font-size: 1.25rem;
+            margin-bottom: 15px;
+        }
+        .summary p {
+            margin-bottom: 15px;
+            line-height: 1.6;
+        }
+        h1 {
+            color: #1a3c6d;
+            font-size: 1.75rem; /* Increased and relative */
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        form {
+            display: flex;
+            flex-direction: column;
+        }
+        label {
+            color: #333;
+            font-weight: bold;
+            margin-bottom: 8px;
+            font-size: 1rem;
+        }
+        input {
+            padding: 12px; /* Increased padding */
+            margin-bottom: 15px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 1rem; /* Larger font */
+            transition: border-color 0.3s;
+        }
+        input:focus {
+            border-color: #1a3c6d;
+            outline: none;
+        }
+        button {
+            background-color: #1a3c6d;
+            color: #fff;
+            padding: 14px; /* Increased padding */
+            border: none;
+            border-radius: 5px;
+            font-size: 1.1rem; /* Larger font */
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #15325b;
+        }
+        #marketPriceDisplay {
+            margin-top: 15px;
+            color: #1a3c6d;
+            font-size: 1.1rem;
+            text-align: center;
+            font-weight: bold;
+        }
+        #result {
+            margin-top: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 1rem; /* Larger font */
+        }
+        th, td {
+            padding: 12px;
+            text-align: right;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        th {
+            background-color: #1a3c6d;
+            color: #fff;
+            font-weight: bold;
+        }
+        tr:nth-child(even) {
+            background-color: #f9fafb;
+        }
+        tr:hover {
+            background-color: #eef2f7;
+            cursor: pointer;
+        }
+        #clickResult {
+            margin-top: 15px;
+            color: #1a3c6d;
+            font-style: italic;
+            text-align: center;
+            font-size: 1rem;
+        }
+
+        /* Media query for larger screens */
+        @media (min-width: 768px) {
+            .wrapper {
+                flex-direction: row; /* Side-by-side layout on larger screens */
+            }
+            .main-content {
+                flex: 1;
+                padding: 30px;
+            }
+            .summary {
+                width: 300px;
+            }
+        }
+    </style>
 </head>
 <body>
-<div class="wrapper">
-<div class="main-content">
-<h1>Sell Put Option Premium Calculator</h1>
-<form id="optionForm">
-<label for="ticker">Stock Ticker:</label>
-<input type="text" id="ticker" placeholder="e.g., AAPL" required>
-<label for="expirationDate">Expiration Date:</label>
-<input type="date" id="expirationDate" required>
-<label for="expectedYield">Expected Yield (%):</label>
-<input type="number" id="expectedYield" step="0.01" min="0" required>
-<button type="button" onclick="calculatePremiums()">Calculate Premiums</button>
-</form>
-<div id="marketPriceDisplay"></div>
-<div id="result"></div>
-<div id="clickResult"></div>
-</div>
-<div class="summary">
-<h2>计算概要</h2>
-<p>该表格显示了在不同行权价格出售看跌期权要实现特定年化收益率（例如8%）需要卖出的净期权价格。行权价格设定为当前市场价格的95%、90%、85%、80%和75%，向下取整。对于每个行权价格：<br>
-- <strong>每股毛期权费</strong> = 行权价格 × (预期收益率 / 100) × (到期天数 / 365)。<br>
-- <strong>每份合约毛期权费</strong> = 每股毛期权费 × 100（1份合约 = 100股）。<br>
-- <strong>每份合约总费用</strong> = $0.65（IBKR Pro佣金）+ $0.30（交易所费用）+ $0.05（清算费用）= $1.00。<br>
-- <strong>每份合约净期权费</strong> = 每份合约毛期权费 - 总费用，最小值为$0.00。<br>
-- <strong>每股净期权费</strong> = 每份合约净期权费 / 100，显示在表格中。<br>
-“你将获得”的金额是每份合约的净期权费（每股净期权费 × 100），反映出售1份合约后扣除费用所得。</p >
-</div>
-</div>
-<script src="script.js"></script>
+    <div class="wrapper">
+        <div class="main-content">
+            <h1>Sell Put Option Premium Calculator</h1>
+            <form id="optionForm">
+                <label for="ticker">Stock Ticker:</label>
+                <input type="text" id="ticker" placeholder="e.g., AAPL" required>
+                <label for="expirationDate">Expiration Date:</label>
+                <input type="date" id="expirationDate" required>
+                <label for="expectedYield">Expected Yield (%):</label>
+                <input type="number" id="expectedYield" step="0.01" min="0" required>
+                <button type="button" onclick="calculatePremiums()">Calculate Premiums</button>
+            </form>
+            <div id="marketPriceDisplay"></div>
+            <div id="result"></div>
+            <div id="clickResult"></div>
+        </div>
+        <div class="summary">
+            <h2>计算概要</h2>
+            <p>该表格显示了在不同行权价格出售看跌期权要实现特定年化收益率（例如8%）需要卖出的净期权价格。行权价格设定为当前市场价格的95%、90%、85%、80%和75%，向下取整。对于每个行权价格：<br>
+            - <strong>每股毛期权费</strong> = 行权价格 × (预期收益率 / 100) × (到期天数 / 365)。<br>
+            - <strong>每份合约毛期权费</strong> = 每股毛期权费 × 100（1份合约 = 100股）。<br>
+            - <strong>每份合约总费用</strong> = $0.65（IBKR Pro佣金）+ $0.30（交易所费用）+ $0.05（清算费用）= $1.00。<br>
+            - <strong>每份合约净期权费</strong> = 每份合约毛期权费 - 总费用，最小值为$0.00。<br>
+            - <strong>每股净期权费</strong> = 每份合约净期权费 / 100，显示在表格中。<br>
+            “你将获得”的金额是每份合约的净期权费（每股净期权费 × 100），反映出售1份合约后扣除费用所得。</p>
+        </div>
+    </div>
+    <script src="script.js"></script>
 </body>
 </html>
