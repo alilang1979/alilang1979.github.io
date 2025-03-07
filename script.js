@@ -13,28 +13,68 @@ function clearError() {
     errorDisplay.classList.remove('active');
 }
 
-async function fetchMarketData(ticker) {
-    const apiKey = 'QEI9SAAQNT1F5S95'; // Replace with your Alpha Vantage API key
-    const quoteUrl = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${ticker}&apikey=${apiKey}`;
-    const historyUrl = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${ticker}&outputsize=compact&apikey=${apiKey}`;
+async function fetchMarketData(ticker, apiKey) {
+    const cacheKey = `marketData-${ticker}`;
+    const cachedData = localStorage.getItem(cacheKey);
+
+    // 检查缓存是否存在且未过期（1小时内）
+    if (cachedData) {
+        const { data, timestamp } = JSON.parse(cachedData);
+        const now = new Date().getTime();
+        if (now - timestamp < 3600000) { // 1小时 = 3600000毫秒
+            console.log('Using cached data for', ticker);
+            return data; // 返回缓存的数据
+        }
+    }
+
+    const quoteUrl = `https://financialmodelingprep.com/api/v3/quote/${ticker}?apikey=${apiKey}`;
 
     try {
         const quoteResponse = await fetch(quoteUrl);
         if (!quoteResponse.ok) throw new Error('Failed to fetch current price. Check your API key or network.');
         const quoteData = await quoteResponse.json();
-        const marketPrice = parseFloat(quoteData['Global Quote']['05. price']);
-        if (!marketPrice || isNaN(marketPrice)) throw new Error('Invalid ticker or no price data available.');
+        console.log('FMP API Response:', quoteData); // 记录API响应
 
+        // FMP返回一个数组，取第一个元素
+        if (!quoteData || quoteData.length === 0) throw new Error('Invalid ticker or no price data available.');
+        const marketPrice = parseFloat(quoteData[0].price);
+        const marketPriceDate = new Date().toISOString().split('T')[0]; // 使用当前日期作为市价的日期
+        if (!marketPrice || isNaN(marketPrice)) throw new Error('Invalid market price data.');
+
+        // 获取历史数据（3个月最低价）
+        const historyUrl = `https://financialmodelingprep.com/api/v3/historical-price-full/${ticker}?serietype=line&apikey=${apiKey}`;
         const historyResponse = await fetch(historyUrl);
         if (!historyResponse.ok) throw new Error('Failed to fetch historical data. Check your API key or network.');
         const historyData = await historyResponse.json();
-        const timeSeries = historyData['Time Series (Daily)'];
-        if (!timeSeries) throw new Error('No historical data available for this ticker.');
-        const prices = Object.values(timeSeries).map(day => parseFloat(day['4. close']));
-        const lowestPrice = Math.min(...prices);
-        if (isNaN(lowestPrice)) throw new Error('Invalid historical price data.');
+        console.log('FMP Historical Data:', historyData); // 记录历史数据
 
-        return { marketPrice, lowestPrice };
+        if (!historyData.historical || historyData.historical.length === 0) throw new Error('No historical data available for this ticker.');
+
+        // 过滤掉无效的历史数据（价格为0或NaN）
+        const validPrices = historyData.historical
+            .filter(day => day.close > 0 && !isNaN(day.close)) // 过滤无效数据
+            .map(day => ({ close: day.close, date: day.date })); // 只保留收盘价和日期
+
+        if (validPrices.length === 0) throw new Error('No valid historical price data available.');
+
+        // 找到3个月内的最低价
+        const threeMonthsAgo = new Date();
+        threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+        const recentPrices = validPrices.filter(day => new Date(day.date) >= threeMonthsAgo);
+        if (recentPrices.length === 0) throw new Error('No valid historical price data in the last 3 months.');
+        const lowestPriceData = recentPrices.reduce((min, day) => day.close < min.close ? day : min, recentPrices[0]);
+
+        // 将数据存入缓存（包含时间戳）
+        const marketData = {
+            marketPrice,
+            marketPriceDate,
+            lowestPrice: lowestPriceData.close,
+            lowestPriceDate: lowestPriceData.date,
+        };
+        localStorage.setItem(cacheKey, JSON.stringify({ data: marketData, timestamp: new Date().getTime() })); // 存储到localStorage
+        console.log('Data cached for', ticker);
+
+        return marketData;
     } catch (error) {
         throw new Error(`Error fetching market data: ${error.message}`);
     }
@@ -42,6 +82,7 @@ async function fetchMarketData(ticker) {
 
 async function calculatePremiums() {
     clearError();
+    const apiKey = document.getElementById('apiKey').value.trim();
     const ticker = document.getElementById('ticker').value.trim().toUpperCase();
     const currentDate = new Date();
     const expirationDates = selectedExpirations.map(days => {
@@ -50,6 +91,10 @@ async function calculatePremiums() {
         return date;
     });
 
+    if (!apiKey) {
+        showError('Please enter a valid API key.');
+        return;
+    }
     if (!ticker) {
         showError('Please enter a valid stock ticker.');
         return;
@@ -60,10 +105,10 @@ async function calculatePremiums() {
     }
 
     try {
-        const { marketPrice, lowestPrice } = await fetchMarketData(ticker);
+        const { marketPrice, marketPriceDate, lowestPrice, lowestPriceDate } = await fetchMarketData(ticker, apiKey);
         document.getElementById('marketPriceDisplay').innerHTML = `
-            Current Market Price: <span style="color: #276749;">$${marketPrice.toFixed(2)}</span> USD<br>
-            3-Month Low: <span style="color: #c53030;">$${lowestPrice.toFixed(2)}</span> USD
+            Current Market Price: <span style="color: #276749;">$${marketPrice.toFixed(2)}</span> USD (${marketPriceDate})<br>
+            3-Month Low: <span style="color: #c53030;">$${lowestPrice.toFixed(2)}</span> USD (${lowestPriceDate})
         `;
 
         const totalFeesPerContract = 1.00;
@@ -124,7 +169,7 @@ async function calculatePremiums() {
                 const reverseInput = document.getElementById('reverseInput');
                 reverseInput.classList.add('active');
                 reverseInput.dataset.row = rowIndex;
-                reverseInput.dataset.col = colIndex; // Store column index for cell-specific yield
+                reverseInput.dataset.col = colIndex; // 存储列索引以计算收益率
             });
         });
     } catch (error) {
@@ -132,6 +177,8 @@ async function calculatePremiums() {
         console.error(error);
     }
 }
+
+// 其他函数保持不变...
 
 async function calculateYield() {
     clearError();
@@ -152,7 +199,7 @@ async function calculateYield() {
         const result = results[rowIndex];
         const strike = strikePrices[colIndex];
         const expiration = result.expirationDate;
-        const T = result.premiums[0].T; // Time to expiration (same for all strikes in row)
+        const T = result.premiums[0].T; // 到期时间（同一行的所有行权价相同）
         const premium = parseFloat(premiumInput);
         const totalFeesPerContract = 1.00;
 
