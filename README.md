@@ -4,4 +4,5 @@
 This tool is a Sell Put Option Strategy Calculator that helps users calculate the annualized yield, win rate, and maximum potential loss of selling put options at specific strike prices, premiums, and expiration dates. By entering the stock ticker, API Key, selecting expiration dates, and setting the target annualized yield, the tool automatically calculates and displays eligible strike prices, premiums, and risk-return data. Users can also click on cells in the table to view detailed profit and risk analysis.
 
 需要去FMP免费注册一个用户，拿到API Key，地址： https://site.financialmodelingprep.com/register
+
 Need API key, you can get it free at: https://site.financialmodelingprep.com/register
