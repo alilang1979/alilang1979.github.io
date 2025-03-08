@@ -191,7 +191,7 @@
             border: 1px solid #e2e8f0;
             color: #2d3748;
             font-size: 0.9rem;
-            text-align: center;
+            text-align: left;
             line-height: 1.6;
         }
         #clickResult span {
@@ -288,13 +288,15 @@
 <body>
     <div class="wrapper">
         <div class="main-content">
-            <h1>Sell Put 策略年化利率计算器 v1.0</h1>
+            <h1>Sell Put 年化利率计算器 v0.5</h1>
+            <h3>Calculate Yield on Short Put</h3>
+            <h3><span style="color: red; font-style: italic;">用于AI编程测试</span></h3>
             <form id="optionForm">
                 <label for="apiKey">API Key - FMP :</label>
                 <input type="text" id="apiKey" placeholder="Enter your FMP API key" required>
-                <label for="ticker">股票代码:</label>
+                <label for="ticker">股票代码 Ticker:</label>
                 <input type="text" id="ticker" placeholder="e.g., AAPL" required>
-                <label for="expiration7">到期日:</label>
+                <label for="expiration7">到期日 Expiration Date:</label>
                 <div class="button-group" id="expirationButtons">
                     <button type="button" id="expiration7" data-days="7">7 Days</button>
                     <button type="button" id="expiration14" data-days="14">14 Days</button>
@@ -303,7 +305,7 @@
                     <button type="button" id="expiration60" data-days="60">2 Months</button>
                     <button type="button" id="expiration90" data-days="90">3 Months</button>
                 </div>
-                <label for="yield8">期望年化 (%):</label>
+                <label for="yield8">期望年化 Target Annualized Yield (%):</label>
                 <div class="button-group" id="yieldButtons">
                     <button type="button" id="yield8" data-yield="8" class="active">8%</button>
                     <button type="button" id="yield10" data-yield="10">10%</button>
@@ -311,7 +313,7 @@
                     <button type="button" id="yield15" data-yield="15">15%</button>
                     <button type="button" id="yield18" data-yield="18">18%</button>
                 </div>
-                <label for="winRate80">胜率:</label>
+                <label for="winRate80">胜率 Win Rate:</label>
                 <div class="button-group" id="winRateButtons">
                     <button type="button" id="winRate80" data-win-rate="80">80%</button>
                     <button type="button" id="winRate85" data-win-rate="85">85%</button>
@@ -319,7 +321,7 @@
                     <button type="button" id="winRate95" data-win-rate="95">95%</button>
                     <button type="button" id="winRate99" data-win-rate="99">99%</button>
                 </div>
-                <button type="button" id="calculateCombinedButton">计算高胜率点位及权利金</button>
+                <button type="button" id="calculateCombinedButton">计算高胜率点位及权利金 Calculate</button>
                 <!-- <button type="button" id="refreshButton">强制刷新数据</button>-->
             </form>
             
@@ -328,17 +330,19 @@
             <div id="result"></div>
             <div id="clickResult"></div>
             <div id="reverseInput">
-                <label for="strikeInput">行权价 ($):</label>
+                <label for="strikeInput">--修改  行权价/权利金 (Customize) --</label>
+                <label for="strikeInput">行权价 Strike($):</label>
                 <input type="number" id="strikeInput" step="0.01" min="0" placeholder="e.g., 95.00" required>
-                <label for="premiumInput">权利金 ($ per share):</label>
+                <label for="premiumInput">权利金 Premiums ($ per share):</label>
                 <input type="number" id="premiumInput" step="0.01" min="0" placeholder="e.g., 2.50" required>
-                <button type="button">计算收益率</button>
+                <button type="button">更新收益率 Update</button>
                 <div id="yieldResult"></div>
             </div>
         </div>
         <div class="summary">
-            <h2>Calculation Overview</h2>
-            <p>This table shows the net premium and max loss for selling put options at various strike prices to achieve a specific annualized yield (e.g., 8%).</p>
+            <h2>说明 （overview）</h2>
+            <p>这个工具是一个 Sell Put 期权策略计算器，帮助用户计算在特定行权价、权利金和到期日下，卖出看跌期权的年化收益率、胜率以及最大可能损失。用户可以通过输入股票代码、API Key、选择到期日和期望年化收益率，工具会自动计算并显示符合条件的行权价、权利金和风险收益数据。用户还可以点击表格中的单元格，查看详细的收益和风险分析。</p>
+            <p>This tool is a Sell Put Option Strategy Calculator that helps users calculate the annualized yield, win rate, and maximum potential loss of selling put options at specific strike prices, premiums, and expiration dates. By entering the stock ticker, API Key, selecting expiration dates, and setting the target annualized yield, the tool automatically calculates and displays eligible strike prices, premiums, and risk-return data. Users can also click on cells in the table to view detailed profit and risk analysis.</p>
         </div>
     </div>
     <script src="script.js"></script>
