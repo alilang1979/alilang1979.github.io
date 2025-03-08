@@ -147,7 +147,22 @@ async function calculateYield() {
         return;
     }
 
-    // 获取输入值
+    // 获取高亮单元格的到期日
+    const expirationDate = highlightedCell.getAttribute('data-expiration');
+    if (!expirationDate) {
+        showError('无法获取到期日，请检查数据。');
+        return;
+    }
+
+    // 获取高亮单元格的天数
+    const days = highlightedCell.getAttribute('data-days');
+    if (!days) {
+        showError('无法获取天数，请检查数据。');
+        return;
+    }
+    const T = days / 365;
+
+    // 获取输入的权利金和行权价
     const strikeInput = document.getElementById('strikeInput').value;
     const premiumInput = document.getElementById('premiumInput').value;
 
@@ -160,14 +175,11 @@ async function calculateYield() {
         return;
     }
 
-    try {
-        // 获取高亮单元格的到期日
-        const days = highlightedCell.getAttribute('data-days');
-        const T = days / 365; // 到期时间（年化）
+    const strike = parseFloat(strikeInput);
+    const premium = parseFloat(premiumInput);
 
+    try {
         // 计算年化收益率
-        const strike = parseFloat(strikeInput);
-        const premium = parseFloat(premiumInput);
         const annualizedYield = (premium / strike) * (365 / days) * 100;
 
         // 计算胜率
@@ -178,7 +190,7 @@ async function calculateYield() {
         document.getElementById('yieldResult').innerHTML = `
             如果权利金是 <span class="premium">$${premium.toFixed(2)}</span> USD 每股, 
             行权价 <span class="strike">$${strike}</span> USD,
-            到期日为 <span class="date">${days} 天</span>, 
+            到期日为 <span class="date">${expirationDate}</span>, 
             则年化收益率为 <span class="yield">${annualizedYield.toFixed(2)}%</span>。<br>
             胜率: <span class="winRate">${(winRate * 100).toFixed(2)}%</span>
         `;
@@ -215,13 +227,13 @@ async function calculateCombinedResults() {
 
         // 更新市场价显示
         document.getElementById('marketPriceDisplay').innerHTML = `
-            当前市场价: <span style="color: #276749;">$${marketPrice.toFixed(2)}</span> USD
-            <button type="button" id="refreshButton" style="margin-left: 10px; padding: 0.25rem 0.5rem; font-size: 0.875rem;">强制刷新</button>
+            市场价 Market Price: <span style="color: #276749;">$${marketPrice.toFixed(2)}</span> USD
+            <button type="button" id="refreshButton" style="margin-left: 10px; padding: 0.25rem 0.5rem; font-size: 0.875rem;">刷新 Refresh</button>
             <br>
-             3月内最低价: <span style="color: #c53030;">$${lowestPrice.toFixed(2)}</span> USD (${lowestPriceDate})<br>
-            波动率: <span style="color: #744210;">${(volatility * 100).toFixed(2)}%</span>
+             3月最低价 Low(3M): <span style="color: #c53030;">$${lowestPrice.toFixed(2)}</span> USD (${lowestPriceDate})<br>
+            波动率 Volatility: <span style="color: #744210;">${(volatility * 100).toFixed(2)}%</span>
             <br>
-        最后刷新时间: <span style="color: #2b6cb0;">${new Date().toLocaleString()}</span>
+            刷新时间 Last Refresh Time: <span style="color: #2b6cb0;">${new Date().toLocaleString()}</span>
 `;
 
         // 计算每个到期日下的高胜率点位
@@ -257,27 +269,23 @@ function displayCombinedResults(results, marketPrice) {
     }
 
     // 构建表格标题
-    let tableHTML = '<table><tr><th>到期日</th>';
+    let tableHTML = '<table><tr><th>到期日 Expiration Date</th>';
     selectedWinRates.forEach(winRate => {
-        const winRateResult = results[0].winRateResults.find(result => result.winRate === winRate);
-        if (!winRateResult) return; // 如果未找到对应的胜率结果，跳过
-
-        const dropPercentage = winRateResult.dropPercentage;
-        const arrow = dropPercentage > 0 ? `<span style="color: #c53030;">↓${dropPercentage}%</span>` : '';
-        tableHTML += `<th>${winRate}% 胜率点位<br>(${arrow})</th>`;
+        tableHTML += `<th>${winRate}% 胜率 Win Rate 点位</th>`;
     });
     tableHTML += '</tr>';
 
     // 构建表格内容
     results.forEach(result => {
-        tableHTML += `<tr><td>${result.expirationDate}</td>`;
+        tableHTML += `<tr><td data-expiration="${result.expirationDate}">${result.expirationDate}</td>`;
         result.winRateResults.forEach(winRateResult => {
-            const { strike, targetPremium, maxLoss } = winRateResult;
+            const { strike, targetPremium, maxLoss, dropPercentage } = winRateResult;
             tableHTML += `
-                <td data-strike="${strike}" data-premium="${targetPremium}" data-days="${result.days}">
-                    行权价: $${strike}<br>
-                    权利金: $${targetPremium.toFixed(2)}<br>
-                    最大损失: $${maxLoss.toFixed(2)}
+                <td data-strike="${strike}" data-premium="${targetPremium}" data-days="${result.days}" data-expiration="${result.expirationDate}">
+                    行权价 Strike Price: $${strike}<br>
+                    目标权利金 Target Premium: $${targetPremium.toFixed(2)}<br>
+                    最大潜在损失 Max Loss: $${maxLoss.toFixed(2)}<br>
+                    相对当前价降幅 Drop: <span style="color: #c53030;">↓${dropPercentage}%</span>
                 </td>
             `;
         });
@@ -289,44 +297,62 @@ function displayCombinedResults(results, marketPrice) {
     document.getElementById('result').innerHTML = tableHTML;
 
     // 绑定点击事件
-    const cells = document.querySelectorAll('#result table td');
-    cells.forEach(cell => {
-        cell.addEventListener('click', async function() {
-            // 移除其他单元格的高亮
-            document.querySelectorAll('#result td').forEach(c => c.classList.remove('highlighted'));
-            // 高亮当前点击的单元格
-            this.classList.add('highlighted');
+const cells = document.querySelectorAll('#result table td');
+cells.forEach(cell => {
+    cell.addEventListener('click', async function() {
+        // 移除其他单元格的高亮
+        document.querySelectorAll('#result td').forEach(c => c.classList.remove('highlighted'));
+        // 高亮当前点击的单元格
+        this.classList.add('highlighted');
 
-            const strike = this.getAttribute('data-strike');
-            const premium = this.getAttribute('data-premium');
-            const days = this.getAttribute('data-days');
+        // 获取行权价、权利金、到期日等信息
+        const strike = parseFloat(this.getAttribute('data-strike')); // 确保是数字
+        const premium = parseFloat(this.getAttribute('data-premium')); // 确保是数字
+        const expirationDate = this.getAttribute('data-expiration'); // 获取到期日
+        const days = this.getAttribute('data-days'); // 获取天数
 
-            // 获取市场数据以计算胜率
-            const apiKey = document.getElementById('apiKey').value.trim();
-            const ticker = document.getElementById('ticker').value.trim().toUpperCase();
-            const { marketPrice, volatility } = await fetchMarketData(ticker, apiKey);
+        // 检查 premium 是否为有效数字
+        if (isNaN(premium)) {
+            showError('权利金数据无效，请检查输入。');
+            return;
+        }
 
-            // 计算胜率
-            const T = days / 365;
-            const winRate = calculateWinRate(marketPrice, strike, T, volatility);
+        // 获取市场数据以计算胜率
+        const apiKey = document.getElementById('apiKey').value.trim();
+        const ticker = document.getElementById('ticker').value.trim().toUpperCase();
+        const { marketPrice, volatility } = await fetchMarketData(ticker, apiKey);
 
-            // 显示详细说明
-            document.getElementById('clickResult').innerHTML = `
-                如果你sell put在<span class="strike">$${strike}</span> USD,
-                到期日 <span class="date">${result.expirationDate}</span>, 
-                如果未被行权则你会得到 <span class="premium">$${(premium * 100).toFixed(2)}</span> USD,
-                年化收益率是 <span class="yield">${selectedYield}%</span>。<br>
-                如果被行权，最大可能损失为： <span class="loss">$${(strike * 100 - premium * 100).toFixed(2)}</span> USD,<br>
-                胜率（Black-Scholes 模型）: <span class="winRate">${(winRate * 100).toFixed(2)}%</span>
+        // 计算胜率
+        const T = days / 365;
+        const winRate = calculateWinRate(marketPrice, strike, T, volatility);
+
+        // 显示详细说明
+        document.getElementById('clickResult').innerHTML = `
+            在 <span class="strike">$${strike}</span> USD 的点位，
+            以 <span class="premium">$${premium.toFixed(2)}</span> USD 每股的权利金，
+            Sell Put，到期日 <span class="date">${expirationDate}</span>，则：<br>
+                1、如果未被行权，则你会得到 <span class="premium">$${(premium * 100).toFixed(2)}</span> USD。
+            年化收益率是 <span class="yield">${selectedYield}%</span>。（假设未使用保证金，按全额计算）<br>
+                2、如果被行权，最大可能损失为：<span class="loss">$${(strike * 100 - premium * 100).toFixed(2)}</span> USD。<br>
+            胜率（指不被行权,收取权利金; 使用历史波动率,通过Black-Scholes 模型计算）: <span class="winRate">${(winRate * 100).toFixed(2)}%</span>
+            <br>
+            --------<br>
+            At the <span class="strike">$${strike}</span> USD strike price,
+            with a premium of <span class="premium">$${premium.toFixed(2)}</span> USD per share,
+                Sell Put, expiration date <span class="date">${expirationDate}</span>, then:<br>
+                1. If not exercised, you will receive <span class="premium">$${(premium * 100).toFixed(2)}</span> USD.
+                Annualized yield is <span class="yield">${selectedYield}%</span>(assuming sufficient funds, no margin used).<br>
+                2. If exercised, the maximum possible loss is <span class="loss">$${(strike * 100 - premium * 100).toFixed(2)}</span> USD.<br>
+            Win Rate (Black-Scholes Model): <span class="winRate">${(winRate * 100).toFixed(2)}%</span>
             `;
 
-            // 显示反向输入框
-            const reverseInput = document.getElementById('reverseInput');
-            reverseInput.classList.add('active');
-            document.getElementById('strikeInput').value = strike;
-            document.getElementById('premiumInput').value = premium;
-        });
+        // 显示反向输入框
+        const reverseInput = document.getElementById('reverseInput');
+        reverseInput.classList.add('active');
+        document.getElementById('strikeInput').value = strike;
+        document.getElementById('premiumInput').value = premium;
     });
+});
 }
 document.getElementById('reverseInput').querySelector('button').addEventListener('click', async () => {
     const strikeInput = document.getElementById('strikeInput').value;
@@ -358,7 +384,7 @@ document.getElementById('reverseInput').querySelector('button').addEventListener
         document.getElementById('yieldResult').innerHTML = `
             如果权利金是 <span class="premium">$${premium.toFixed(2)}</span> USD 每股, 
             行权价 <span class="strike">$${strike}</span> USD,
-            到期日为 <span class="date">${days} 天</span>, 
+            到期日为 <span class="date">${expirationDate}</span>, 
             则年化收益率为 <span class="yield">${annualizedYield.toFixed(2)}%</span>。<br>
             胜率: <span class="winRate">${(winRate * 100).toFixed(2)}%</span>
         `;
@@ -413,13 +439,13 @@ document.addEventListener('DOMContentLoaded', () => {
             fetchMarketData(ticker, apiKey, true).then(data => {
                 // 更新市场价显示
                 document.getElementById('marketPriceDisplay').innerHTML = `
-                    当前市场价: <span style="color: #276749;">$${data.marketPrice.toFixed(2)}</span> USD
-                    <button type="button" id="refreshButton" style="margin-left: 10px; padding: 0.25rem 0.5rem; font-size: 0.875rem;">强制刷新</button>
+                    市场价 Market Price: <span style="color: #276749;">$${marketPrice.toFixed(2)}</span> USD
+                    <button type="button" id="refreshButton" style="margin-left: 10px; padding: 0.25rem 0.5rem; font-size: 0.875rem;">刷新 Refresh</button>
+                 <br>
+                    3月最低价 Low(3M): <span style="color: #c53030;">$${lowestPrice.toFixed(2)}</span> USD (${lowestPriceDate})<br>
+                    波动率 Volatility: <span style="color: #744210;">${(volatility * 100).toFixed(2)}%</span>
                     <br>
-                    3月内最低价: <span style="color: #c53030;">$${data.lowestPrice.toFixed(2)}</span> USD (${data.lowestPriceDate})<br>
-                    波动率: <span style="color: #744210;">${(data.volatility * 100).toFixed(2)}%</span>
-                    <br>
-                    最后刷新时间: <span style="color: #2b6cb0;">${new Date().toLocaleString()}</span>
+                    刷新时间 Last Refresh Time: <span style="color: #2b6cb0;">${new Date().toLocaleString()}</span>
                 `;
             }).catch(error => {
                 showError(`强制刷新失败: ${error.message}`);
